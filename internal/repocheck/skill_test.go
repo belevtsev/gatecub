@@ -167,7 +167,7 @@ func TestSkillHeads(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join(repoRoot, "skills", "*", "SKILL.md"))
 	opted, _ := filepath.Glob(filepath.Join(repoRoot, "plugins", "*", "skills", "*", "SKILL.md"))
 	if paths = append(paths, opted...); err != nil || len(paths) < 3 {
-		t.Fatalf("want the skills task and kitsu under skills/ and managed in the opt-in plugin, got %v (%v)", paths, err)
+		t.Fatalf("want the skills task and kitsu under skills/ and managed in the role plugin, got %v (%v)", paths, err)
 	}
 	for _, path := range paths {
 		data, err := os.ReadFile(path)

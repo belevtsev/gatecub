@@ -11,6 +11,7 @@ _kitsu_version=${KITSU_VERSION:-}
 _kitsu_install_dir=${KITSU_INSTALL_DIR:-}
 _kitsu_no_modify_path=${KITSU_NO_MODIFY_PATH:-0}
 _kitsu_archive_dir=${KITSU_ARCHIVE_DIR:-}
+_kitsu_no_team=${KITSU_NO_TEAM:-0}
 _kitsu_agent_host=
 _kitsu_cli_only=0
 _kitsu_set_default=0
@@ -22,12 +23,14 @@ usage() {
 	printf '%s\n' \
 		'Usage: install.sh [--version TAG] [--install-dir DIR] [--no-modify-path]' \
 		'                  [--archive-dir DIR] [--host codex|claude | --cli-only] [--set-default]' \
+		'                  [--no-team]' \
 		'' \
 		'Choose Codex or Claude Code in a terminal, or supply --host for automation.' \
 		'Install the latest CLI and matching plugin. Use --set-default to change your saved host.' \
+		'The role plugin kitsu-team is installed too. Use --no-team to leave it out or remove it.' \
 		'The default install directory is $HOME/.local/bin. CLI-only installs use the latest release.' \
 		'Environment: KITSU_VERSION, KITSU_INSTALL_DIR, KITSU_NO_MODIFY_PATH=1,' \
-		'             KITSU_ARCHIVE_DIR, KITSU_DOWNLOAD_BASE.' \
+		'             KITSU_ARCHIVE_DIR, KITSU_DOWNLOAD_BASE, KITSU_NO_TEAM=1.' \
 		'With an archive directory, the installer uses the single archive tag for this platform in SHA256SUMS unless a version is provided.'
 }
 
@@ -129,6 +132,10 @@ while [ "$#" -gt 0 ]; do
 			_kitsu_no_modify_path=1
 			shift
 			;;
+		--no-team)
+			_kitsu_no_team=1
+			shift
+			;;
 		--help|-h)
 			usage
 			exit 0
@@ -161,6 +168,11 @@ fi
 case "$_kitsu_no_modify_path" in
 	0|1) ;;
 	*) argument_error 'KITSU_NO_MODIFY_PATH must be 0 or 1' ;;
+esac
+case "$_kitsu_no_team" in
+	0) _kitsu_team_flag= ;;
+	1) _kitsu_team_flag=--no-team ;;
+	*) argument_error 'KITSU_NO_TEAM must be 0 or 1' ;;
 esac
 if [ -z "$_kitsu_install_dir" ]; then
 	[ -n "${HOME:-}" ] || fail 'HOME is unset; specify --install-dir'
@@ -496,10 +508,17 @@ configure_path() {
 printf 'Installed kitsu %s at %s.\n' "$_kitsu_version" "$_kitsu_target"
 configure_path
 if [ -n "$_kitsu_agent_host" ]; then
-	"$_kitsu_target" agent setup --host "$_kitsu_agent_host" --archive-dir "$_kitsu_plugin_dir" || {
+	if [ -n "$_kitsu_team_flag" ]; then
+		# Releases before the role plugin keep the roles inside the one plugin.
+		case $("$_kitsu_target" agent setup --help 2>/dev/null || :) in
+			*--no-team*) ;;
+			*) fail "kitsu $_kitsu_version has no separate role plugin, so --no-team does not apply to it. Rerun the installer without --no-team and without KITSU_NO_TEAM." ;;
+		esac
+	fi
+	"$_kitsu_target" agent setup --host "$_kitsu_agent_host" --archive-dir "$_kitsu_plugin_dir" ${_kitsu_team_flag:+"$_kitsu_team_flag"} || {
 		[ -z "$_kitsu_remote_host" ] || fail "$_kitsu_agent_host setup failed. After fixing the reported problem, rerun the installer with --host $_kitsu_agent_host."
 		fail "$_kitsu_agent_host setup failed. Retry with this command.
-$(quote_shell_argument "$_kitsu_target") agent setup --host $_kitsu_agent_host --archive-dir $(quote_shell_argument "$_kitsu_archive_dir")"
+$(quote_shell_argument "$_kitsu_target") agent setup --host $_kitsu_agent_host --archive-dir $(quote_shell_argument "$_kitsu_archive_dir")${_kitsu_team_flag:+ $_kitsu_team_flag}"
 	}
 	save_agent_default() {
 		if [ "$_kitsu_set_default" -eq 1 ]; then

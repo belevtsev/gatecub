@@ -16,6 +16,7 @@ Options:
   --host <codex|claude>    override the saved CLI host preference
   --archive-dir <directory> required directory containing kitsu-plugin.zip and
                             SHA256SUMS
+  --no-team                leave out, or remove, the role plugin kitsu-team
   --help, -h               show this command's help without executing it
 
 Host: --host > KITSU_HOST > private checkout preference > personal preference.

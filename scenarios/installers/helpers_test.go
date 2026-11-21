@@ -40,9 +40,17 @@ func TestMain(m *testing.M) {
 		fmt.Printf("kitsu %s\nrevision fixture\n", version)
 		os.Exit(0)
 	}
+	if len(os.Args) == 4 && strings.Join(os.Args[1:], " ") == "agent setup --help" {
+		// A release before the role plugin does not know --no-team.
+		if os.Getenv("KITSU_TEST_SETUP_BEFORE_TEAM") == "" {
+			fmt.Println("--no-team")
+		}
+		os.Exit(0)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "agent" {
 		fmt.Printf("fixture agent arguments %q\n", os.Args[1:])
-		if host := os.Getenv("KITSU_TEST_SETUP_HOST"); host != "" && len(os.Args) == 7 &&
+		withoutTeam := len(os.Args) == 8 && os.Args[7] == "--no-team" && os.Getenv("KITSU_TEST_SETUP_BEFORE_TEAM") == ""
+		if host := os.Getenv("KITSU_TEST_SETUP_HOST"); host != "" && (len(os.Args) == 7 || withoutTeam) &&
 			os.Args[2] == "setup" && os.Args[3] == "--host" && os.Args[4] == host && os.Args[5] == "--archive-dir" {
 			plugin, err := os.ReadFile(filepath.Join(os.Args[6], "kitsu-plugin.zip"))
 			sums, manifestErr := os.ReadFile(filepath.Join(os.Args[6], "SHA256SUMS"))

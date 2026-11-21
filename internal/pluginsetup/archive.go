@@ -20,6 +20,8 @@ const (
 	archiveName     = "kitsu-plugin.zip"
 	marketplaceName = "kitsu-marketplace"
 	pluginID        = "kitsu@kitsu"
+	teamID          = "kitsu-team@kitsu"
+	teamDir         = "plugins/kitsu-team"
 	manifestLimit   = 1 << 20
 	archiveLimit    = 32 << 20
 )
@@ -55,7 +57,7 @@ func loadRelease(dir, host string) (release, error) {
 	if err != nil {
 		return release{}, fmt.Errorf("read %s: %w", archiveName, err)
 	}
-	version := pluginVersion(members[pluginManifest(host)].data)
+	version := pluginVersion(members[pluginManifest(host)].data, "kitsu")
 	if !isKitsuMarketplace(host, members[marketManifest(host)].data) || version == "" {
 		return release{}, fmt.Errorf("%s must contain a local Kitsu marketplace and plugin manifest for %s", archiveName, host)
 	}
@@ -197,12 +199,39 @@ func marketManifest(host string) string {
 
 func pluginManifest(host string) string { return "." + host + "-plugin/plugin.json" }
 
-func pluginVersion(data []byte) string {
+func pluginVersion(data []byte, name string) string {
 	var plugin struct{ Name, Version string }
-	if json.Unmarshal(data, &plugin) != nil || plugin.Name != "kitsu" {
+	if json.Unmarshal(data, &plugin) != nil || plugin.Name != name {
 		return ""
 	}
 	return plugin.Version
+}
+
+// part is one plugin of the marketplace as a host installs it: its id, its
+// directory in the marketplace and the release files of that directory.
+type part struct {
+	id, dir string
+	files   release
+}
+
+func (r release) kitsu() part { return part{id: pluginID, dir: ".", files: r} }
+
+// team is the role plugin. It is missing from an archive that holds none.
+func (r release) team(host string) (part, bool) {
+	role := part{id: teamID, dir: teamDir, files: release{digest: r.digest, members: map[string]member{}}}
+	for name, entry := range r.members {
+		if name == teamDir {
+			role.files.members["."] = entry
+		} else if rest, ok := strings.CutPrefix(name, teamDir+"/"); ok {
+			role.files.members[rest] = entry
+		}
+	}
+	return role, role.version(host) != ""
+}
+
+func (p part) version(host string) string {
+	name, _, _ := strings.Cut(p.id, "@")
+	return pluginVersion(p.files.members[pluginManifest(host)].data, name)
 }
 
 func isKitsuMarketplace(host string, data []byte) bool {
@@ -213,7 +242,7 @@ func isKitsuMarketplace(host string, data []byte) bool {
 			Source json.RawMessage
 		}
 	}
-	want := [][2]string{{"kitsu", "./"}, {"kitsu-team", "./plugins/kitsu-team"}} // The opt-in plugin may follow the default one.
+	want := [][2]string{{"kitsu", "./"}, {"kitsu-team", "./plugins/kitsu-team"}} // The role plugin may follow the default one.
 	if json.Unmarshal(data, &market) != nil || market.Name != "kitsu" || len(market.Plugins) == 0 || len(market.Plugins) > len(want) {
 		return false
 	}

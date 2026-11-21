@@ -189,7 +189,7 @@ working tree.
 
 ### The coordinator
 
-The developer's host session coordinates the work. For managed work, the `managed` skill of the opt-in `kitsu-team` plugin holds the instructions printed by `kitsu role text coordinator`. A normal plugin request follows the [daily workflow](task-harness.md#how-a-daily-task-runs). Run
+The developer's host session coordinates the work. For managed work, the `managed` skill of the `kitsu-team` plugin holds the instructions printed by `kitsu role text coordinator`. A normal plugin request follows the [daily workflow](task-harness.md#how-a-daily-task-runs). Run
 `kitsu agent check --host codex` or `--host claude` to inspect local setup, then
 `kitsu task start "<coding request>" --host <host>` to explicitly launch that host with the task
 skill. For an existing desktop session, add `--print` and paste its handoff. Print and JSON
@@ -499,7 +499,7 @@ of them within 60,000, and search the texts for the names of languages and build
 
 ### Claude Code
 
-This repository ships two plugins for Claude Code. The default plugin `kitsu` holds the skills under `skills/` and the hooks in `hooks/hooks.json`. The [opt-in plugin `kitsu-team`](release-install.md#add-role-coordination) holds the seven role files under `plugins/kitsu-team/agents/` and the `managed` skill. Neither `plugin.json`
+This repository ships two plugins for Claude Code. The default plugin `kitsu` holds the skills under `skills/` and the hooks in `hooks/hooks.json`. The [plugin `kitsu-team`](release-install.md#role-coordination), which you can turn off, holds the seven role files under `plugins/kitsu-team/agents/` and the `managed` skill. Neither `plugin.json`
 names these paths; they are in the folders a Claude Code plugin uses for agents, skills
 and hooks. Ask `/kitsu-team:managed` to use the managed role workflow and the coordinator starts specialists as `kitsu-team:<role>`. The `tools` list of a role file is for Claude Code to apply; `kitsu` does
 not apply it.

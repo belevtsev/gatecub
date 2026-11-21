@@ -159,8 +159,8 @@ func writeFixture(t *testing.T, path string, data []byte) {
 }
 
 // A marketplace is Kitsu's own when it lists the default plugin at its root,
-// alone or followed by the opt-in plugin in its own directory.
-func TestMarketplaceListsTheDefaultPluginAndAtMostTheOptInOne(t *testing.T) {
+// alone or followed by the role plugin in its own directory.
+func TestMarketplaceListsTheDefaultPluginAndAtMostTheRoleOne(t *testing.T) {
 	entry := func(host, name, path string) string {
 		if host == "codex" {
 			return fmt.Sprintf(`{"name":%q,"source":{"source":"local","path":%q}}`, name, path)

@@ -147,7 +147,7 @@ func workflowStartNotice(o workflowOptions) string {
 	if o.local {
 		return "Runner: local. The approved checks of kitsu.toml run as you, in a private copy of your change. No agent starts, so the run uses no tokens."
 	}
-	return optInCost + " Supervised runs are not measured."
+	return roleWorkflowCost + " Supervised runs are not measured."
 }
 
 // localRunnerMark tells a result of the local runner from one of a registered

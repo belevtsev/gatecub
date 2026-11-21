@@ -210,3 +210,65 @@ func TestInstallerAgentFailurePreservesCLIAndShowsRetry(t *testing.T) {
 		})
 	}
 }
+
+// The role plugin is installed unless the developer turns it off, with the
+// option or the variable. A release that keeps the roles inside its one plugin
+// cannot leave them out, and says so.
+func TestInstallerTurnsTheRolePluginOffOnRequest(t *testing.T) {
+	assets := fixtureAssets(t, preparedVersion)
+	assets["kitsu-plugin.zip"] = []byte("paired plugin")
+	assets["SHA256SUMS"] = append(assets["SHA256SUMS"], checksumLine("kitsu-plugin.zip", assets["kitsu-plugin.zip"])...)
+	archiveFlag, hostFlag, teamFlag := "--archive-dir", "--host", "--no-team"
+	if runtime.GOOS == "windows" {
+		archiveFlag, hostFlag, teamFlag = "-ArchiveDir", "-AgentHost", "-NoTeam"
+	}
+	for _, shell := range nativeInstallers(t) {
+		for _, test := range []struct {
+			name, variable, before string
+			option, off            bool
+			fails                  string
+		}{
+			{name: "installed by default"},
+			{name: "option", option: true, off: true},
+			{name: "variable", variable: "1", off: true},
+			{name: "release before the role plugin", option: true, before: "1", fails: "no separate role plugin"},
+			{name: "variable with another value", variable: "yes", fails: "KITSU_NO_TEAM"},
+		} {
+			t.Run(shell.name+"/"+test.name, func(t *testing.T) {
+				if test.variable == "yes" && runtime.GOOS == "windows" {
+					t.Skip("install.ps1 reads any value but 1 as unset")
+				}
+				run := newInstallRun(t, shell, "http://127.0.0.1:1")
+				archives := filepath.Join(run.dir, "archives")
+				for name, data := range assets {
+					writeFile(t, filepath.Join(archives, name), data)
+				}
+				run.env["KITSU_TEST_SETUP_HOST"] = "codex"
+				if test.variable != "" {
+					run.env["KITSU_NO_TEAM"] = test.variable
+				}
+				if test.before != "" {
+					run.env["KITSU_TEST_SETUP_BEFORE_TEAM"] = test.before
+				}
+				args := []string{archiveFlag, archives, hostFlag, "codex"}
+				if test.option {
+					args = append(args, teamFlag)
+				}
+				output, err := run.run(false, args...)
+				if test.fails != "" {
+					if err == nil || !strings.Contains(output, test.fails) {
+						t.Fatalf("want a failure that names %q: %v\n%s", test.fails, err, output)
+					}
+					return
+				}
+				want := []string{"agent", "setup", "--host", "codex", "--archive-dir", archives}
+				if test.off {
+					want = append(want, "--no-team")
+				}
+				if err != nil || !strings.Contains(output, fmt.Sprintf("fixture agent arguments %q\n", want)) {
+					t.Fatalf("plugin setup did not receive %q: %v\n%s", want, err, output)
+				}
+			})
+		}
+	}
+}

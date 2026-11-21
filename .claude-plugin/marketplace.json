@@ -3,7 +3,7 @@
   "name": "kitsu",
   "owner": { "name": "Pavlo Belevtsev", "url": "https://github.com/belevtsev" },
   "metadata": {
-    "description": "Kitsu: verified coding tasks and a Git check-evidence gate, plus opt-in role coordination.",
+    "description": "Kitsu: verified coding tasks and a Git check-evidence gate, plus role coordination that you can turn off.",
     "version": "0.0.2"
   },
   "plugins": [
@@ -16,7 +16,7 @@
     {
       "name": "kitsu-team",
       "source": "./plugins/kitsu-team",
-      "description": "Opt-in and experimental: coordinate specification, implementation, testing and review with seven role agents, OpenSpec records and supervised runs. Needs the kitsu plugin. It costs several times the tokens of a daily task.",
+      "description": "Experimental: coordinate specification, implementation, testing and review with seven role agents, OpenSpec records and supervised runs. Installed with Kitsu unless you turn it off. Needs the kitsu plugin. A managed task costs several times the tokens of a daily task.",
       "category": "development"
     }
   ]

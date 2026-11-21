@@ -40,7 +40,7 @@ func TextSize(id string) int {
 }
 
 // Skill is the skill for a daily task, in the default plugin. TeamPlugin is the
-// opt-in plugin with the roles, which a host names as plugin:role; TeamRoot is
+// second plugin with the roles, which a host names as plugin:role; TeamRoot is
 // its directory and ManagedSkill its skill with the coordinator's instructions.
 const (
 	Skill        = "skills/task"
@@ -57,7 +57,7 @@ func generated(id string) string {
 }
 
 // HostFiles are the files the plugins ship, by their path from the root of
-// the repository: the skill for a daily task, and in the opt-in plugin one
+// the repository: the skill for a daily task, and in the role plugin one
 // file for each role and the skill with the coordinator's instructions. Each
 // is made from one text, so the two cannot drift apart.
 func HostFiles() (map[string]string, error) {

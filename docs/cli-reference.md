@@ -623,6 +623,8 @@ Options:
   --include <path>         include a pre-existing change in the authorized
                            commit
   --expect <text>          require a reviewed assertion with -- PROGRAM ARGS
+  --local                  run the jobs on this machine, gated by the approved
+                           checks of kitsu.toml
   --require-review         require an independent review of the candidate
   --retry                  retry the current stage after resolving a reported
                            problem

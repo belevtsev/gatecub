@@ -18,7 +18,7 @@ func readRegistration() ([]byte, error) {
 	location, err := filepath.EvalSymlinks(directory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, errors.New("configure a trusted workflow runner in /etc/kitsu/workflow-runners.json")
+			return nil, ErrUnregistered // nothing is registered on this machine
 		}
 		return nil, err
 	}

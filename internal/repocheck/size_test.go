@@ -24,7 +24,15 @@ const (
 	maxVerificationLines = 2200 // Behavioral plans, shared history and current local task observations.
 	maxInsightLines      = 3000 // Read-only workflow diagnostics, optional notes and explicit budget metadata.
 	maxConfiguredLines   = 3004 // Persisted role orchestration, the supervised runner protocol and the interface a runner implements.
+	maxLocalRunnerLines  = 1500 // Jobs of a configured task on the developer's machine: checks now, headless agents next.
 )
+
+// localRunnerCode includes the detached start in internal/proc, which exists
+// for the supervisor of a local job and may start a program only there.
+func localRunnerCode(file string) bool {
+	return strings.HasPrefix(file, "internal/localrunner/") || strings.HasPrefix(file, "internal/cli/localrunner") ||
+		strings.HasPrefix(file, "internal/proc/detach")
+}
 
 // rolesCode says whether a Go file belongs to the role workflow.
 func rolesCode(file string) bool {
@@ -57,7 +65,7 @@ func TestGoCodeStaysWithinItsSizeLimits(t *testing.T) {
 	harnessLines := 0
 	insightLines := 0
 	releaseLines := 0
-	configuredLines := 0
+	configuredLines, localRunnerLines := 0, 0
 	for _, file := range repoFiles(t) {
 		if !strings.HasSuffix(file, ".go") || strings.HasSuffix(file, "_test.go") || strings.Contains(file, "/testdata/") {
 			continue
@@ -69,6 +77,8 @@ func TestGoCodeStaysWithinItsSizeLimits(t *testing.T) {
 		lines := bytes.Count(data, []byte("\n"))
 		if configuredWorkflowCode(file) {
 			configuredLines += lines
+		} else if localRunnerCode(file) {
+			localRunnerLines += lines
 		} else if strings.HasPrefix(file, "internal/tickets/") || strings.HasPrefix(file, "internal/gitx/harness_") || strings.HasPrefix(file, "internal/harness/") || strings.HasPrefix(file, "internal/cli/harness_") {
 			harnessLines += lines
 		} else if strings.HasPrefix(file, "internal/insights/") || strings.HasPrefix(file, "internal/taskbudget/") || strings.HasPrefix(file, "internal/cli/usage_") {
@@ -115,6 +125,10 @@ func TestGoCodeStaysWithinItsSizeLimits(t *testing.T) {
 	const maxReleaseLines = 410 // Repository-only release assembly, integrity and publication.
 	t.Logf("release automation: %d of %d lines", releaseLines, maxReleaseLines)
 	t.Logf("configured workflows: %d of %d lines", configuredLines, maxConfiguredLines)
+	t.Logf("local runner: %d of %d lines", localRunnerLines, maxLocalRunnerLines)
+	if localRunnerLines > maxLocalRunnerLines {
+		t.Errorf("the local runner holds %d lines of Go, want at most %d", localRunnerLines, maxLocalRunnerLines)
+	}
 	if configuredLines > maxConfiguredLines {
 		t.Errorf("configured workflows hold %d lines of Go, want at most %d", configuredLines, maxConfiguredLines)
 	}

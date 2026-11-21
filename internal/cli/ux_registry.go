@@ -68,7 +68,7 @@ func uxCommands() []uxCommand {
 		{path: "usage record", summary: "Record a host token notice from standard input", flags: []uxFlag{uxOption("host", "codex|claude", "required notice format; explicit host avoids protocol guessing", "codex", "claude")}, run: runUXUsageRecord},
 	}
 	list = append(list, harnessCommands()...)
-	list = append(list, workflowCommand())
+	list = append(list, workflowCommand(), localJobCommand())
 	list = append(list, compactCommands()...)
 	list = append(list, workerCommands()...)
 	list = append(list, usageBudgetCommands()...)

@@ -186,7 +186,7 @@ func savedWorkflowReceipt(s *session, task *harness.Task, proof *harness.Workflo
 	client := s.workflowRunner
 	if client == nil {
 		var err error
-		client, err = workflowrunner.Load(s.repo.Root)
+		client, err = savedWorkflowRunner(s.repo.Root, w)
 		if err != nil {
 			return zero, false
 		}
@@ -246,5 +246,5 @@ func workflowVerificationStatus(s *session, t *harness.Task) (string, bool) {
 	if t.RepositoryPolicy == undeclaredPolicy {
 		return undeclaredPolicy, true
 	}
-	return "passed", true
+	return "passed" + localRunnerMark(t), true
 }

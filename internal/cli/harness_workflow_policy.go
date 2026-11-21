@@ -11,6 +11,7 @@ import (
 	"github.com/belevtsev/kitsu/v3/internal/decl"
 	"github.com/belevtsev/kitsu/v3/internal/evidence"
 	"github.com/belevtsev/kitsu/v3/internal/harness"
+	"github.com/belevtsev/kitsu/v3/internal/localrunner"
 	"github.com/belevtsev/kitsu/v3/internal/roles"
 	"github.com/belevtsev/kitsu/v3/internal/verification"
 	"github.com/belevtsev/kitsu/v3/internal/workflowrunner"
@@ -95,7 +96,7 @@ func reviewedWorkflowChecks(ctx context.Context, s *session, task *harness.Task,
 			ids = append(ids, id)
 		}
 	}
-	if len(ids) == 0 {
+	if len(ids) == 0 && w.Profile != localrunner.Profile { // The declared checks alone gate a local run.
 		return nil, failf("verification requires an approved behavioral assertion")
 	}
 	declared, err := evidence.Declaration(ctx, s.repo, candidate.Tree)

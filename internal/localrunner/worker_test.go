@@ -48,29 +48,6 @@ func silentHost() int {
 	return 0
 }
 
-// installHost puts a copy of this test program, named as the host, first on
-// PATH and returns its directory.
-func installHost(t *testing.T, host string) string {
-	t.Helper()
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	program, err := os.ReadFile(self)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir := t.TempDir()
-	if runtime.GOOS == "windows" {
-		host += ".exe"
-	}
-	if err := os.WriteFile(filepath.Join(dir, host), program, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return dir
-}
-
 func roleJob(r *Runner, deadline time.Time) workflowrunner.Job {
 	return workflowrunner.Job{Attempt: attemptName, Binding: "binding", Profile: Profile, Policy: workflowrunner.Digest(r.Offer().Policy),
 		Kind: "implement", Role: "developer", Host: "codex", Prompt: "Change nothing.", Schema: json.RawMessage(`{"type":"object"}`), Deadline: deadline}

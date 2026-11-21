@@ -16,7 +16,7 @@ const (
 	maxAdviserLines      = 4040 // Includes native advice and private configured story intake.
 	maxSkillLines        = 2000
 	maxUXLines           = 3790 // Shared routing, help, install defaults, forms, completion and approval.
-	maxOnboardingLines   = 2014 // Local setup diagnostics, verified plugin installation and explicit host handoff.
+	maxOnboardingLines   = 2130 // Local setup diagnostics, verified installation of both plugins with the role plugin's off switch, and explicit host handoff.
 	maxContextLines      = 2000 // Opt-in Go collection, briefs, compact checks and private artifacts.
 	maxWorkerLines       = 1500 // Saved dispatch, local intervals, bounded QE hints and configured handback checks.
 	maxProtocolLines     = 700  // Explicit native launch descriptions and bounded untrusted hand-backs.

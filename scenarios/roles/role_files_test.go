@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-// roleFile is the Claude Code file of a role, in the opt-in plugin. managedSkill
+// roleFile is the Claude Code file of a role, in the role plugin. managedSkill
 // holds the coordinator's instructions there.
 func roleFile(id string) string { return "plugins/kitsu-team/agents/" + id + ".md" }
 
@@ -84,7 +84,7 @@ func TestASearchOfTheTexts(t *testing.T) {
 	})
 
 	// What the host reads: the role files and the coordinator's instructions
-	// of the opt-in plugin, and the skill for a daily task.
+	// of the role plugin, and the skill for a daily task.
 	t.Run("host files", func(t *testing.T) {
 		t.Parallel()
 		for _, id := range roleIDs {

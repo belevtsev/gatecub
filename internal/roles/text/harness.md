@@ -13,4 +13,4 @@ Stage the change, then run `kitsu task do ID --request TEXT --expect BEHAVIOR --
 
 When the reply has `then`, do it and run the command again. Give the developer the task ID, check results and remaining findings.
 
-Read references/steps.md for planning, features, failed PR checks, publication, delegation, a saved task or recovery. Managed roles, OpenSpec changes, role settings and supervised runs need the `managed` skill of the opt-in `kitsu-team` plugin.
+Read references/steps.md for planning, features, failed PR checks, publication, delegation, a saved task or recovery. Managed roles, OpenSpec changes, role settings and supervised runs need the `managed` skill of the `kitsu-team` plugin.

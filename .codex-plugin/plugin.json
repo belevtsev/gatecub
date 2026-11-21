@@ -13,7 +13,7 @@
     "displayName": "Kitsu",
     "logo": "./docs/brand/kitsu-mascot.png",
     "shortDescription": "Verify coding tasks and gate commits",
-    "longDescription": "Start or resume a task in either coding host. One command opens the task, runs its assertion and commits the verified change. Kitsu saves the task's scope, checks and review evidence in the worktree. An optional Git gate checks evidence before commits and pushes. Role coordination and supervised runs are in the opt-in kitsu-team plugin.",
+    "longDescription": "Start or resume a task in either coding host. One command opens the task, runs its assertion and commits the verified change. Kitsu saves the task's scope, checks and review evidence in the worktree. An optional Git gate checks evidence before commits and pushes. Role coordination and supervised runs are in the kitsu-team plugin.",
     "developerName": "Pavlo Belevtsev",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Write"],

@@ -2,7 +2,7 @@
 
 Kitsu coordinates Codex and Claude Code from one saved task. For supervised execution, an administrator registers a disposable runner for this worktree. The runner starts each assigned specialist, verifies the accepted files in isolation, and signs the result. Kitsu imports authorized edits, records evidence, and resumes the next step.
 
-[Install the opt-in `kitsu-team` plugin](release-install.md#add-role-coordination) and [set up a trusted runner](workflow-runner.md) before using `task run`. Use the [daily task skill](task-harness.md) for ordinary in-chat work.
+Keep the [`kitsu-team` plugin](release-install.md#role-coordination) installed and [set up a trusted runner](workflow-runner.md) before using `task run`. Use the [daily task skill](task-harness.md) for ordinary in-chat work.
 
 ## Start and resume from either host
 

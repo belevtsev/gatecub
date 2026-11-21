@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Breaking
 
-- Install the opt-in [`kitsu-team` plugin](docs/release-install.md#add-role-coordination) to keep the role agents and the managed workflow in your host. The CLI commands are unchanged.
+- The role agents and the managed workflow are in a second plugin, [`kitsu-team`](docs/release-install.md#role-coordination). It is installed by default; `--no-team` turns it off.
 - Start managed work with the `managed` skill of `kitsu-team`. On Claude Code, the role agents are now named `kitsu-team:<role>`.
 - Name the remote of another base repository in [`--pr-base upstream:main`](docs/task-harness.md#delivery-and-limits). A plain `--pr-base main` now confirms only a PR in the pushed repository.
 - Register a [trusted runner](docs/workflow-runner.md) for `kitsu task run`. Continue a local-launch preview record by opening a new task with the original request and assertion.

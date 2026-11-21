@@ -51,21 +51,31 @@ paste; `--json` also exposes diagnostics and proposed argv. Both modes execute n
 create no task record. See [onboarding](cli.md#check-setup-and-start-a-task) for exit statuses and
 ready, broken, and unknown evidence. Installing the supporting Git gate is a separate step.
 
-<a name="add-role-coordination"></a>
+<a name="role-coordination"></a>
 
-## Add role coordination
+## Role coordination
 
-The installer enables the `kitsu` plugin: the daily task skill, the gate skill and the host hooks. The seven role agents, the managed role workflow, OpenSpec records, role settings and supervised runs are in a second plugin of the same marketplace, `kitsu-team`. It is opt-in and experimental. On two small tasks, one run each, the roles used about 5 and 39 times the tokens of a plain agent ([what an agent spends](benchmarks.md#what-an-agent-spends)).
+The installer sets up two plugins of the same marketplace:
 
-```sh
-codex plugin add kitsu-team@kitsu
-```
+- `kitsu` has the daily task skill, the gate skill and the host hooks.
+- `kitsu-team` has the seven role agents, the managed role workflow, OpenSpec records, role settings and supervised runs. It is experimental.
 
-```sh
-claude plugin install kitsu-team@kitsu
-```
+With `kitsu-team` installed, each session carries about 160 more words of role and skill descriptions. The managed workflow starts only when you ask for it. On two small tasks, one run each, the roles used about 5 and 39 times the tokens of a plain agent ([what an agent spends](benchmarks.md#what-an-agent-spends)). In Claude Code, start managed work with `/kitsu-team:managed`. In Codex, ask for Kitsu's `managed` skill.
 
-Restart the host. In Claude Code, start managed work with `/kitsu-team:managed`. In Codex, ask for Kitsu's `managed` skill. Keep the `kitsu` plugin enabled: it supplies the hooks that both plugins use.
+### Turn it off
+
+- **When you install or upgrade.** Add `--no-team` to the installer (`-NoTeam` in PowerShell), or set `KITSU_NO_TEAM=1`. The installer leaves `kitsu-team` out, and removes it when it is installed.
+- **Later, in Claude Code.** Run `claude plugin disable kitsu-team@kitsu`.
+- **Later, in Codex.** Run `codex plugin remove kitsu-team@kitsu`. To keep it installed and disabled instead, set `enabled = false` under `[plugins."kitsu-team@kitsu"]` in `~/.codex/config.toml`.
+
+Restart the host afterwards. Keep the `kitsu` plugin enabled: it supplies the hooks that both plugins use.
+
+A later install or upgrade keeps your choice only in part:
+
+- A `kitsu-team` that is **disabled** in the host stays disabled, and is not updated until you enable it and install again.
+- A `kitsu-team` that you **removed** is installed again, unless you pass `--no-team` or set `KITSU_NO_TEAM=1`.
+
+To turn it on again, enable it in the host (`claude plugin enable kitsu-team@kitsu`), or run the installer without `--no-team`. A release that keeps the roles inside its one plugin, v0.0.2 and earlier, has nothing to turn off: the installer refuses `--no-team` for it.
 
 ## Choose a version or directory
 
@@ -97,6 +107,7 @@ CI build, use the bundled installer and pass its artifact directory.
 | `--cli-only` | `-CliOnly` | — | Install the preview CLI without prompting or changing the saved host. |
 | `--install-dir DIR` | `-InstallDir DIR` | `KITSU_INSTALL_DIR` | Choose the destination directory. |
 | `--no-modify-path` | `-NoModifyPath` | `KITSU_NO_MODIFY_PATH=1` | Install without changing user `PATH`. |
+| `--no-team` | `-NoTeam` | `KITSU_NO_TEAM=1` | Leave out the role plugin `kitsu-team`, and remove it when it is installed. [Role coordination](#role-coordination) |
 | `--archive-dir DIR` | `-ArchiveDir DIR` | `KITSU_ARCHIVE_DIR` | Use local archives and `SHA256SUMS`, with no download. |
 
 Explicit arguments override environment defaults. Unix value options also accept `--flag=value`.
@@ -189,16 +200,18 @@ if ((Get-FileHash kitsu-plugin.zip).Hash -ne $lines[0].Line.Split(" ")[0]) { thr
 Expand-Archive kitsu-plugin.zip -DestinationPath $pluginDir
 ```
 
-Register the absolute path to the extracted marketplace with your chosen host. Replace `/path/to/kitsu-marketplace` with that directory. The local marketplace supplies the `kitsu` plugin with both skills and the host hook definitions, and the opt-in [`kitsu-team` plugin](#add-role-coordination) with the role instructions.
+Register the absolute path to the extracted marketplace with your chosen host. Replace `/path/to/kitsu-marketplace` with that directory. The local marketplace supplies the `kitsu` plugin with both skills and the host hook definitions, and the [`kitsu-team` plugin](#role-coordination) with the role instructions. Leave its line out to install without the roles.
 
 ```sh
 codex plugin marketplace add /path/to/kitsu-marketplace
 codex plugin add kitsu@kitsu
+codex plugin add kitsu-team@kitsu
 ```
 
 ```sh
 claude plugin marketplace add /path/to/kitsu-marketplace
 claude plugin install kitsu@kitsu
+claude plugin install kitsu-team@kitsu
 ```
 
 Open a new terminal in your working repository. Run `kitsu task open --help` to confirm the daily CLI is on PATH, then `kitsu agent check --host codex` or `--host claude`. In Codex review the definitions in `/hooks` to enable trusted execution. [Start or resume a daily task](task-harness.md)

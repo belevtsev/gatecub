@@ -16,11 +16,11 @@ func TestCodexInstallCanRetryAfterPartialSetup(t *testing.T) {
 	install := codexInstallStep(savedRelease(t, r))
 	install.err = errors.New("installation failed")
 	withFailure := hostScript(t, codexMarketStep(market), install)
-	if err := installCodex(t.Context(), withFailure, market, r); !errors.Is(err, install.err) {
+	if err := setupError(installCodex(t.Context(), withFailure, market, r, true)); !errors.Is(err, install.err) {
 		t.Fatalf("partial setup = %v, want native error", err)
 	}
 	withRetry := hostScript(t, codexMarketStep(market), codexInstallStep(savedRelease(t, r)), codexPluginStep(market, "1.2.3"))
-	if err := installCodex(t.Context(), withRetry, market, r); err != nil {
+	if err := setupError(installCodex(t.Context(), withRetry, market, r, true)); err != nil {
 		t.Fatalf("retry after partial setup: %v", err)
 	}
 }
@@ -39,7 +39,7 @@ func TestCodexReplacesPriorLocalMarketplace(t *testing.T) {
 	install := codexInstallStep(savedRelease(t, r))
 	t.Run("native registration moves to the matching build", func(t *testing.T) {
 		run := hostScript(t, conflict, local, remove, codexMarketStep(market), install, codexPluginStep(market, "1.2.3"))
-		if err := installCodex(t.Context(), run, market, r); err != nil {
+		if err := setupError(installCodex(t.Context(), run, market, r, true)); err != nil {
 			t.Fatal(err)
 		}
 		if err := old.verify(previous); err != nil {
@@ -50,21 +50,21 @@ func TestCodexReplacesPriorLocalMarketplace(t *testing.T) {
 		blocked := codexMarketStep(market)
 		blocked.err = errors.New("new registration failed")
 		run := hostScript(t, conflict, local, remove, blocked, codexMarketStep(previous))
-		if err := installCodex(t.Context(), run, market, r); !errors.Is(err, blocked.err) {
+		if err := setupError(installCodex(t.Context(), run, market, r, true)); !errors.Is(err, blocked.err) {
 			t.Fatalf("failed re-registration = %v", err)
 		}
 	})
 	t.Run("foreign marketplace is preserved", func(t *testing.T) {
 		run := hostScript(t, conflict, codexMarketListStep("git", "example.org/kitsu"))
-		assertSetupError(t, installCodex(t.Context(), run, market, r), "another marketplace")
+		assertSetupError(t, setupError(installCodex(t.Context(), run, market, r, true)), "another marketplace")
 	})
 	t.Run("stale installed bytes fail even after native success", func(t *testing.T) {
 		run := hostScript(t, codexMarketStep(market), codexInstallStep(previous))
-		assertSetupError(t, installCodex(t.Context(), run, market, r), "installed files do not match")
+		assertSetupError(t, setupError(installCodex(t.Context(), run, market, r, true)), "installed files do not match")
 	})
 	t.Run("stale effective source fails even with matching installed bytes", func(t *testing.T) {
 		run := hostScript(t, codexMarketStep(market), install, codexPluginStep(previous, "1.2.3"))
-		assertSetupError(t, installCodex(t.Context(), run, market, r), "different Kitsu marketplace")
+		assertSetupError(t, setupError(installCodex(t.Context(), run, market, r, true)), "different Kitsu marketplace")
 	})
 }
 
@@ -81,7 +81,7 @@ func TestClaudeRefreshesSameVersionInstallAndPreservesData(t *testing.T) {
 	fresh := claudePluginStep(installed, market, "1.2.3")
 	t.Run("same package reuses native installation", func(t *testing.T) {
 		run := hostScript(t, current, add, current, install, fresh)
-		if err := installClaude(t.Context(), run, market, r); err != nil {
+		if err := setupError(installClaude(t.Context(), run, market, r, true)); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -89,7 +89,7 @@ func TestClaudeRefreshesSameVersionInstallAndPreservesData(t *testing.T) {
 		stale := claudePluginStep(previous, market, "1.2.3")
 		remove := hostStep{args: []string{"uninstall", "--keep-data", "--scope", "user", pluginID}}
 		run := hostScript(t, before, add, current, install, stale, remove, install, fresh)
-		if err := installClaude(t.Context(), run, market, r); err != nil {
+		if err := setupError(installClaude(t.Context(), run, market, r, true)); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -97,22 +97,22 @@ func TestClaudeRefreshesSameVersionInstallAndPreservesData(t *testing.T) {
 		stale := claudePluginStep(previous, market, "1.2.2")
 		update := hostStep{args: []string{"update", "--scope", "user", pluginID}}
 		run := hostScript(t, before, add, current, install, stale, update, fresh)
-		if err := installClaude(t.Context(), run, market, r); err != nil {
+		if err := setupError(installClaude(t.Context(), run, market, r, true)); err != nil {
 			t.Fatal(err)
 		}
 	})
 	t.Run("foreign marketplace is preserved", func(t *testing.T) {
 		run := hostScript(t, claudeMarketStep("github", previous))
-		assertSetupError(t, installClaude(t.Context(), run, market, r), "another marketplace")
+		assertSetupError(t, setupError(installClaude(t.Context(), run, market, r, true)), "another marketplace")
 	})
 	t.Run("native add must repoint the marketplace before install", func(t *testing.T) {
 		run := hostScript(t, before, add, before)
-		assertSetupError(t, installClaude(t.Context(), run, market, r), "did not register the verified")
+		assertSetupError(t, setupError(installClaude(t.Context(), run, market, r, true)), "did not register the verified")
 	})
 	t.Run("native list must report the matching effective source", func(t *testing.T) {
 		stale := claudePluginStep(installed, previous, "1.2.3")
 		run := hostScript(t, before, add, current, install, stale)
-		assertSetupError(t, installClaude(t.Context(), run, market, r), "different marketplace directory")
+		assertSetupError(t, setupError(installClaude(t.Context(), run, market, r, true)), "different marketplace directory")
 	})
 }
 
@@ -124,6 +124,9 @@ func savedRelease(t *testing.T, r release) string {
 	}
 	return marketplace
 }
+
+// setupError drops what a setup did with the role plugin.
+func setupError(_ string, err error) error { return err }
 
 func assertSetupError(t *testing.T, err error, want string) {
 	t.Helper()

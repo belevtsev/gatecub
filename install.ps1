@@ -21,6 +21,8 @@ An interactive terminal offers a choice when this parameter is omitted.
 Replaces the current personal default after successful plugin setup.
 .PARAMETER CliOnly
 Installs the CLI without prompting for or setting up an agent host.
+.PARAMETER NoTeam
+Leaves out the role plugin kitsu-team, and removes it when it is installed. Also set by KITSU_NO_TEAM=1.
 .EXAMPLE
 irm https://raw.githubusercontent.com/belevtsev/kitsu/main/install.ps1 | iex
 .EXAMPLE
@@ -34,12 +36,13 @@ param(
     [string]$ArchiveDir = $env:KITSU_ARCHIVE_DIR,
     [string]$AgentHost,
     [switch]$CliOnly,
-    [switch]$SetDefault
+    [switch]$SetDefault,
+    [switch]$NoTeam = ($env:KITSU_NO_TEAM -eq '1')
 )
 
 # Keep preferences and helper functions out of an interactive irm | iex session.
 & {
-    param($ReleaseVersion, $DestinationDir, $LeavePath, $LocalArchives, $SelectedHost, $HostSpecified, $SkipHost, $ReplaceDefault)
+    param($ReleaseVersion, $DestinationDir, $LeavePath, $LocalArchives, $SelectedHost, $HostSpecified, $SkipHost, $ReplaceDefault, $SkipTeam)
     $ErrorActionPreference = 'Stop'
     Set-StrictMode -Version 2.0
 
@@ -402,15 +405,23 @@ param(
         else { Write-Host 'Added the installation directory to your user PATH and this session PATH.' }
         if ($SelectedHost) {
             $SelectedHost = $SelectedHost.ToLowerInvariant()
+            $teamFlag = @()
+            if ($SkipTeam) {
+                # Releases before the role plugin keep the roles inside the one plugin.
+                if (-not (((& $destination agent setup --help) -join "`n") -match '--no-team')) {
+                    throw "Kitsu $ReleaseVersion has no separate role plugin, so -NoTeam does not apply to it. Rerun the installer without -NoTeam and without KITSU_NO_TEAM."
+                }
+                $teamFlag = @('--no-team')
+            }
             try {
-                & $destination agent setup --host $SelectedHost --archive-dir $pluginDir
+                & $destination agent setup --host $SelectedHost --archive-dir $pluginDir @teamFlag
                 if ($LASTEXITCODE -ne 0) { throw "Kitsu exited with code $LASTEXITCODE." }
             }
             catch {
                 if ($remoteHost) { throw "$SelectedHost setup failed. After fixing the reported problem, rerun the installer with -AgentHost $SelectedHost. $($_.Exception.Message)" }
                 $retryExecutable = $destination.Replace("'", "''")
                 $retryArchiveDir = $source.Replace("'", "''")
-                [Console]::Error.WriteLine("Retry with this command.`n& '$retryExecutable' agent setup --host $SelectedHost --archive-dir '$retryArchiveDir'")
+                [Console]::Error.WriteLine("Retry with this command.`n& '$retryExecutable' agent setup --host $SelectedHost --archive-dir '$retryArchiveDir'$(if ($SkipTeam) { ' --no-team' })")
                 throw "$SelectedHost setup failed. $($_.Exception.Message)"
             }
             try {
@@ -449,4 +460,4 @@ param(
         if ($null -ne $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
     }
-} $Version $InstallDir $NoModifyPath.IsPresent $ArchiveDir $AgentHost ($PSBoundParameters.ContainsKey('AgentHost')) $CliOnly.IsPresent $SetDefault.IsPresent
+} $Version $InstallDir $NoModifyPath.IsPresent $ArchiveDir $AgentHost ($PSBoundParameters.ContainsKey('AgentHost')) $CliOnly.IsPresent $SetDefault.IsPresent $NoTeam.IsPresent

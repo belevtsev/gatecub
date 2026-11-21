@@ -27,7 +27,7 @@ kitsu task start "Fix login retries" --host claude --compact --print
 
 The second command prepares a handoff for an existing session. Neither `--print` nor `--json`
 launches a host or writes task records. You can also ask an existing coordinator to use compact
-mode; it loads the [on-demand reference](../plugins/kitsu-team/skills/managed/references/compact.md) of the `managed` skill in the opt-in `kitsu-team` plugin.
+mode; it loads the [on-demand reference](../plugins/kitsu-team/skills/managed/references/compact.md) of the `managed` skill in the `kitsu-team` plugin.
 Default onboarding and session-hook output remain as before. Help works before any setup:
 
 ```sh

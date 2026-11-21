@@ -307,14 +307,14 @@ func TestSupervisedRunStatesTheMeasuredCostBeforeItsFirstJob(t *testing.T) {
 	f := newWorkflowFixture(t, nil)
 	f.pause = true
 	started, _ := f.run("Plan a change", "--id", "case", "--until", "plan")
-	cost, job := strings.Index(started, optInCost), strings.Index(started, "Kitsu task case · ")
+	cost, job := strings.Index(started, roleWorkflowCost), strings.Index(started, "Kitsu task case · ")
 	if cost < 0 || job >= 0 && job < cost || !strings.Contains(started, "Supervised runs are not measured.") {
 		t.Fatalf("a new run did not state its cost before its first job:\n%s", started)
 	}
 	f.mu.Lock()
 	f.pause = false
 	f.mu.Unlock()
-	if resumed, err := f.run("--resume", "case"); err != nil || strings.Contains(resumed, optInCost) {
+	if resumed, err := f.run("--resume", "case"); err != nil || strings.Contains(resumed, roleWorkflowCost) {
 		t.Fatalf("resuming repeated the cost or failed: %v\n%s", err, resumed)
 	}
 }

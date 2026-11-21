@@ -245,7 +245,7 @@ When you’re ready for the fix, reply in the same chat.
 
 ## Choose who does the work
 
-Role settings and the supervised workflow are opt-in: [add the `kitsu-team` plugin](docs/release-install.md#add-role-coordination) first. It costs several times the tokens of a daily task. Then start the [supervised workflow preview](docs/configured-workflow.md) from either host once a [trusted runner](docs/workflow-runner.md) is registered. For a new task in a repository without role settings, Kitsu uses the default host you chose at install. You can assign each role its own host, model, and reasoning effort.
+Role settings and the supervised workflow come with the `kitsu-team` plugin. The installer adds it, and [`--no-team` turns it off](docs/release-install.md#role-coordination). A managed task costs several times the tokens of a daily task. Start the [supervised workflow preview](docs/configured-workflow.md) from either host once a [trusted runner](docs/workflow-runner.md) is registered. For a new task in a repository without role settings, Kitsu uses the default host you chose at install. You can assign each role its own host, model, and reasoning effort.
 
 ```sh
 kitsu role init

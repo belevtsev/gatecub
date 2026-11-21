@@ -40,7 +40,7 @@ func reserveWorkflowAttempt(ctx context.Context, s *session, l *stageLedger, t *
 	if err := checkHarnessPolicy(ctx, s, t, v.Candidate.Tree); err != nil {
 		return blockedWorkflowStep(step, err.Error()), nil
 	}
-	if role == "quality-engineer" && len(w.TestPolicy) == 0 || role == "developer" && len(s.workflowRunner.Offer().Policy.CodePaths) == 0 {
+	if role == "quality-engineer" && len(w.TestPolicy) == 0 || role == "developer" && len(s.workflowRunner.Offer().Policy.CodePaths) == 0 && !t.Direct() {
 		return blockedWorkflowStep(step, "The runner policy must approve this role's writable paths."), nil
 	}
 	var err error
@@ -90,7 +90,7 @@ func prepareWorkflowAttempt(l *stageLedger, s *session, t *harness.Task, v harne
 	var err error
 	a := &harness.WorkflowAttempt{ID: rand.Text(), Role: role, Host: settings.Host, Action: v.Next, Ticket: v.Ticket,
 		Candidate: v.Candidate, Rework: rework, Started: time.Now().UTC()}
-	if role == "developer" || role == "quality-engineer" {
+	if w.Plan != nil && (role == "developer" || role == "quality-engineer") {
 		a.Shared, err = workflowSharedFingerprints(s.repo.Root, w.Plan.Shared)
 		if err != nil {
 			return nil, err
@@ -252,7 +252,7 @@ func acceptWorkflowWorker(ctx context.Context, s *session, l *stageLedger, t *ha
 	case "blocked":
 		return completeWorkflowFailure(l, t, result.Note)
 	case "test_defect":
-		if a.Role == "developer" && len(got.Changes) == 0 {
+		if a.Role == "developer" && len(got.Changes) == 0 && !t.Direct() {
 			w.Pending = workflowCorrections(w.Pending, "tests", "repair")
 			finishWorkflowAttempt(t, "test_defect")
 			t.Events = append(t.Events, workflowEvent(a, a.Candidate, result.Note))

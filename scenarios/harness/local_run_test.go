@@ -10,8 +10,8 @@ import (
 	"github.com/belevtsev/kitsu/v3/internal/kitsutest"
 )
 
-// A local run needs role assignments today, although one that starts at
-// verification starts no agent.
+// A local run needs all role assignments today, although it starts at most a
+// developer and a reviewer.
 const localRunRoles = `version = 2
 [roles.lookup]
 host = "codex"
@@ -58,21 +58,16 @@ func TestLocalRunVerifiesAChangeWithTheDeclaredChecksAlone(t *testing.T) {
 	}
 }
 
-func TestLocalRunRefusesUnapprovedChecksAndAgentStages(t *testing.T) {
+func TestLocalRunRefusesUnapprovedChecks(t *testing.T) {
 	r := localRunRepo(t, kitsutest.Demo(t))
-	if got := r.Kitsu("task", "run", "--local", "Fix the demo", "--id", "agent"); got.Code != 1 || !strings.Contains(got.Output(), "starts no agent yet") {
-		t.Fatalf("a run that needs an agent was not refused, exit %d:\n%s", got.Code, got.Output())
-	}
 	r.Write("kitsu.toml", kitsutest.DemoDeclaration+"\n[[check]]\nid = \"extra\"\nrun = [\"sh\", \"lint.sh\"]\n")
 	r.Git("commit", "-qam", "Declare one more check")
 	got := r.Kitsu("task", "run", "--local", "Verify the demo", "--id", "untrusted", "--entry", "verify")
 	if got.Code != 1 || !strings.Contains(got.Output(), "kitsu check trust") {
 		t.Fatalf("checks that nobody approved were not refused, exit %d:\n%s", got.Code, got.Output())
 	}
-	for _, id := range []string{"agent", "untrusted"} {
-		if show := r.Kitsu("task", "show", id); show.Code == 0 {
-			t.Fatalf("the refused run saved task %s:\n%s", id, show.Output())
-		}
+	if show := r.Kitsu("task", "show", "untrusted"); show.Code == 0 {
+		t.Fatalf("the refused run saved the task:\n%s", show.Output())
 	}
 }
 

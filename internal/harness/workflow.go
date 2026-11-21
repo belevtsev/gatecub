@@ -136,6 +136,12 @@ func WorkflowRole(action string) string {
 	}
 }
 
+// Direct says that the developer works without an architect's plan and a test
+// writer's tests: a local run (localrunner.Profile) that starts after them.
+func (t *Task) Direct() bool {
+	return t.Workflow.Profile == "local" && t.Scope.Entry != "plan" && t.Scope.Entry != "tests"
+}
+
 func (w *Workflow) HasCorrection(action string) bool { return slices.Contains(w.Pending, action) }
 
 func (w *Workflow) ResolveCorrection(action string) {
@@ -213,13 +219,13 @@ func (t *Task) workflowNeedsCode() bool {
 }
 
 func (t *Task) workflowCodingAction(state Readiness, needsCode bool) string {
-	w := t.Workflow
+	w, planned := t.Workflow, !t.Direct()
 	switch {
-	case w.Plan == nil || w.HasCorrection("plan"):
+	case planned && (w.Plan == nil || w.HasCorrection("plan")):
 		return "plan"
-	case w.Test == nil || t.Latest("tests") == nil || w.HasCorrection("tests"):
+	case planned && (w.Test == nil || t.Latest("tests") == nil || w.HasCorrection("tests")):
 		return "tests"
-	case !w.BaselineReady:
+	case planned && !w.BaselineReady:
 		return "baseline"
 	case !needsCode:
 		return ""

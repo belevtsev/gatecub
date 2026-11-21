@@ -232,8 +232,10 @@ func validateWorkflowChanges(ctx context.Context, s *session, task *harness.Task
 		if protected[f.Path] {
 			return nil, failf("runner changed reviewed check input %q", f.Path)
 		}
-		if err := validateWorkflowFileScope(s, w, old, f); err != nil {
-			return nil, err
+		if !task.Direct() { // The protected paths above are the only limit of a run without a plan.
+			if err := validateWorkflowFileScope(s, w, old, f); err != nil {
+				return nil, err
+			}
 		}
 		if existed {
 			before = append(before, old)
@@ -268,7 +270,7 @@ func pathWithinWorkflowHooks(name, hookPath string) bool {
 }
 
 func validWorkflowChange(file workflowrunner.File) bool {
-	if !validWorkflowPath(file.Path) || roles.ProtectedWorkflowPath(file.Path) {
+	if !validWorkflowPath(file.Path) || roles.ProtectedWorkflowPath(file.Path) || strings.HasPrefix(strings.ToLower(file.Path), "openspec/") {
 		return false
 	}
 	switch file.Mode {

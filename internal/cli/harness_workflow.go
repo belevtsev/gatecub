@@ -42,9 +42,9 @@ func workflowCommand() uxCommand {
 
 type workflowOptions struct {
 	harnessOptions
-	resume, nativeHost, actorID, release string
-	reworkMax                            int
-	approveAssertion, local              bool
+	resume, release         string
+	reworkMax               int
+	approveAssertion, local bool
 }
 
 func parseWorkflow(args []string) (workflowOptions, error) {
@@ -59,8 +59,6 @@ func parseWorkflow(args []string) (workflowOptions, error) {
 	f.BoolVar(&o.scope.Commit, "commit", false, "")
 	f.Var(&o.includes, "include", "")
 	f.StringVar(&o.expect, "expect", "", "")
-	f.StringVar(&o.nativeHost, "native-host", "", "")
-	f.StringVar(&o.actorID, "actor", "", "")
 	f.StringVar(&o.release, "release", "", "")
 	f.IntVar(&o.reworkMax, "rework-limit", 0, "")
 	f.BoolVar(&o.retry, "retry", false, "")
@@ -76,9 +74,6 @@ func parseWorkflow(args []string) (workflowOptions, error) {
 		return o, err
 	}
 	o.argv = p.rest
-	if o.nativeHost != "" || o.actorID != "" {
-		return o, usagef("configured tasks use Kitsu-supervised workers; start or resume without --native-host and --actor")
-	}
 	if o.approveAssertion {
 		return o, usagef("assertions must be in the trusted runner's reviewed policy")
 	}
@@ -125,7 +120,7 @@ func (o workflowOptions) validateResume(f *flag.FlagSet, p parsed) error {
 	}
 	var err error
 	f.Visit(func(f *flag.Flag) {
-		if !slices.Contains([]string{"resume", "native-host", "actor", "retry", "release", "rework-limit", "json", "include", "approve-assertion"}, f.Name) {
+		if !slices.Contains([]string{"resume", "retry", "release", "rework-limit", "json", "include", "approve-assertion"}, f.Name) {
 			err = usagef("use task extend to change scope on a saved task")
 		}
 	})
@@ -262,7 +257,7 @@ func bindWorkflowIntake(ctx context.Context, s *session, task *harness.Task, o w
 	if task.RepositoryPolicy != s.workflowRunner.Offer().Policy.Declaration {
 		return failf("the opening kitsu.toml differs from the runner's reviewed check declaration")
 	}
-	if o.scope.Until != "plan" && o.scope.Until != "review" && o.scope.Entry != "verify" && len(task.Workflow.TestPolicy) == 0 {
+	if o.scope.Until != "plan" && o.scope.Until != "review" && o.scope.Entry != "verify" && len(task.Workflow.TestPolicy) == 0 && !task.Direct() {
 		return failf("the runner policy must define the repository's test paths")
 	}
 	if task.Scope.Commit {
@@ -301,7 +296,7 @@ func addWorkflowIncludes(task *harness.Task, o workflowOptions) error {
 		return nil
 	}
 	w := task.Workflow
-	if w.Active != nil || o.nativeHost != "" || !task.Scope.Commit {
+	if w.Active != nil || !task.Scope.Commit {
 		return failf("confirm pre-existing edits for the authorized commit from your terminal after workers stop")
 	}
 	for _, name := range o.includes {

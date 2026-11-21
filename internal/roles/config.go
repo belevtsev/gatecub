@@ -75,9 +75,9 @@ func Load(root string) (*Config, error) {
 	return load(root, nil)
 }
 
-// LoadWithWorkflowDefault uses a one-host policy when the repository has no roles file.
-func LoadWithWorkflowDefault(root, host string) (*Config, error) {
-	return load(root, WorkflowTemplate(host))
+// LoadWithWorkflowDefault uses template when the repository has no roles file.
+func LoadWithWorkflowDefault(root string, template []byte) (*Config, error) {
+	return load(root, template)
 }
 
 // WorkflowTemplate assigns the required specialists to one host.

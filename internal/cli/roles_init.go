@@ -72,5 +72,5 @@ func dailyRoleConfig(root string) (*roles.Config, error) {
 	if host == "" {
 		return nil, usagef("create role assignments with `kitsu role init --host codex|claude`")
 	}
-	return roles.LoadWithWorkflowDefault(root, host)
+	return roles.LoadWithWorkflowDefault(root, roles.WorkflowTemplate(host))
 }

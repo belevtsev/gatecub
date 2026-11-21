@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Run a task on your own machine with [`kitsu task run --local`](docs/configured-workflow.md#run-a-task-on-your-own-machine): a headless developer and reviewer behind your approved checks.
+- A local run needs no flags and no roles file: it starts at the developer, requires a review, puts the reviewer on your other installed host and lists the tokens of each stage.
 
 - Open, verify and commit a daily task or bug ticket with [one `kitsu task do` command](docs/task-harness.md#do-a-daily-task-in-one-command).
 

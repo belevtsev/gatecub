@@ -111,3 +111,31 @@ func TestLocalRunStartsNoArchitectAndNoTestWriter(t *testing.T) {
 		t.Fatalf("the refused run saved a task or started a host:\n%s", show.Output())
 	}
 }
+
+// Codex 0.171.0 sets both variables for every command of a chat, and keeps
+// the Git directory read-only there: Kitsu cannot write the records of a task,
+// and an agent cannot sign in.
+func TestLocalRunIsRefusedInsideTheSandboxOfACodexChat(t *testing.T) {
+	r := localRunRepo(t, kitsutest.Demo(t))
+	calls := scriptHosts(t, r, nil)
+	if got := r.Kitsu("task", "run", "--local", "Verify the demo", "--id", "outside", "--entry", "verify"); got.Code != 0 {
+		t.Fatalf("the checks did not run outside the sandbox, exit %d:\n%s", got.Code, got.Output())
+	}
+	r.Setenv("CODEX_SANDBOX", "seatbelt")
+	r.Setenv("CODEX_SANDBOX_NETWORK_DISABLED", "1")
+	for name, args := range map[string][]string{
+		"a run with agents":     {"--local", "Add a greeting", "--id", "sandboxed"},
+		"a run of the checks":   {"--local", "Verify the demo", "--id", "sandboxed", "--entry", "verify"},
+		"a resume of a run":     {"--resume", "outside"},
+		"a reply for a chat":    {"--local", "Add a greeting", "--id", "sandboxed", "--json"},
+		"a resume with a reply": {"--resume", "outside", "--json"},
+	} {
+		got := r.Kitsu(append([]string{"task", "run"}, args...)...)
+		if got.Code != 1 || !strings.Contains(got.Output(), "Run the same command in your own terminal") {
+			t.Errorf("%s was not refused in the sandbox, exit %d:\n%s", name, got.Code, got.Output())
+		}
+	}
+	if show := r.Kitsu("task", "show", "sandboxed"); show.Code == 0 || len(calls("codex"))+len(calls("claude")) != 0 {
+		t.Fatalf("a refused run saved a task or started a host:\n%s", show.Output())
+	}
+}

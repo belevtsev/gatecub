@@ -311,6 +311,10 @@ func TestSupervisedRunStatesTheMeasuredCostBeforeItsFirstJob(t *testing.T) {
 	if cost < 0 || job >= 0 && job < cost || !strings.Contains(started, "Supervised runs are not measured.") {
 		t.Fatalf("a new run did not state its cost before its first job:\n%s", started)
 	}
+	// The line of a job is the same as before the local runner: it names the action alone.
+	if !strings.Contains(started, "Kitsu task case · plan\n") {
+		t.Fatalf("the progress line of a supervised job changed:\n%s", started)
+	}
 	f.mu.Lock()
 	f.pause = false
 	f.mu.Unlock()

@@ -87,6 +87,7 @@ func parseWorkflow(args []string) (workflowOptions, error) {
 		o.id = o.resume
 		return o, nil
 	}
+	o.localDefaults(f)
 	return o.openRequest(p)
 }
 
@@ -149,9 +150,7 @@ func runConfiguredWorkflow(ctx context.Context, cfg Config, args []string) error
 		return err
 	}
 
-	if o.resume == "" {
-		fmt.Fprintf(cfg.Err, "Kitsu task %s. Resume with kitsu task run --resume %s\n%s\n", o.id, o.id, workflowStartNotice(o))
-	}
+	announceWorkflow(ctx, s, o)
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -198,7 +197,7 @@ func workflowIntake(ctx context.Context, s *session, o workflowOptions) error {
 		}
 		return failf("task %s already exists; use --resume %s", o.id, o.id)
 	}
-	roleConfig, err := dailyRoleConfig(s.repo.Root)
+	roleConfig, err := workflowRoleConfig(s.repo.Root, o.local)
 	if err != nil {
 		return err
 	}
@@ -340,13 +339,14 @@ func reportWorkflow(s *session, o workflowOptions, step workflowStep) error {
 		if step.message != "" {
 			v["diagnostic"] = step.message
 		}
-		if err := printJSON(s.cfg, v); err != nil {
+		if err := printWorkflowReply(s, o, v); err != nil {
 			return err
 		}
 	} else {
 		if step.message != "" {
 			fmt.Fprintln(s.cfg.Err, step.message)
 		}
+		printWorkflowUsage(s, o.id)
 		if err := printHarness(s.cfg, o.harnessOptions, step.view); err != nil {
 			return err
 		}

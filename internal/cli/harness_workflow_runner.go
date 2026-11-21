@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -155,7 +154,7 @@ func launchWorkflowAttempt(ctx context.Context, s *session, o workflowOptions, s
 	if step.job != nil {
 		runCtx, cancel := context.WithDeadline(ctx, step.deadline)
 		defer cancel()
-		fmt.Fprintf(s.cfg.Err, "Kitsu task %s · %s\n", o.id, a.Action)
+		announceWorkflowStage(s, o, a)
 		signed, got, err = s.workflowRunner.Run(runCtx, *step.job)
 	} else {
 		signed, got, err = s.workflowRunner.Resume(ctx, a.ID, a.Binding, a.Job)

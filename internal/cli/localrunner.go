@@ -1,16 +1,26 @@
 package cli
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/belevtsev/kitsu/v3/internal/decl"
 	"github.com/belevtsev/kitsu/v3/internal/harness"
 	"github.com/belevtsev/kitsu/v3/internal/localrunner"
+	"github.com/belevtsev/kitsu/v3/internal/onboarding"
+	"github.com/belevtsev/kitsu/v3/internal/roles"
 	"github.com/belevtsev/kitsu/v3/internal/workflowrunner"
 )
 
@@ -47,7 +57,11 @@ func openWorkflowRunner(ctx context.Context, cfg Config, s *session, o workflowO
 	}
 	switch {
 	case local && o.resume == "" && (o.scope.Entry == "plan" || o.scope.Entry == "tests"):
-		return nil, errors.New("a local run starts no architect and no test writer yet. Add --entry implement, review or verify")
+		return nil, errors.New("a local run starts no architect and no test writer yet. Leave --entry out to start at the developer, or enter at review or verify")
+	case local && os.Getenv("CODEX_SANDBOX")+os.Getenv("CODEX_SANDBOX_NETWORK_DISABLED") != "":
+		// Codex sets these for the commands of a chat. There Kitsu cannot
+		// write the records of a task, and an agent cannot sign in.
+		return nil, errors.New("this command runs in the sandbox of a Codex chat, where a local run cannot write its records or start an agent. Run the same command in your own terminal")
 	case local:
 		return openLocalRunner(ctx, s, pinned)
 	case cfg.workflowRunner != nil:
@@ -91,7 +105,7 @@ func openLocalRunner(ctx context.Context, s *session, pinned string) (workflowru
 	if approval, err := trustFile(s.repo, ""); err != nil || string(approval.data) != fingerprint+"\n" {
 		return nil, errors.New("approve the checks of kitsu.toml with kitsu check trust in your own terminal first")
 	}
-	config, err := dailyRoleConfig(s.repo.Root)
+	config, err := roles.Load(s.repo.Root) // for its test paths: the checks alone need no host
 	if err != nil {
 		return nil, err
 	}
@@ -142,12 +156,189 @@ func workflowStopReason(got workflowrunner.Receipt) string {
 	return ": " + result.Error
 }
 
-// workflowStartNotice is what a new run says before its first job.
-func workflowStartNotice(o workflowOptions) string {
-	if o.local {
-		return "Runner: local. The approved checks of kitsu.toml and each agent run as you, in a private copy of your change. An agent is a fresh Codex or Claude Code process and uses tokens of your account."
+// localDefaults are the defaults of a new run on this machine. It starts at
+// the developer and ends after an independent review, --commit delivers, and
+// at most three reviews start. A run that enters at review or verify starts
+// no agent that its flags did not ask for.
+func (o *workflowOptions) localDefaults(f *flag.FlagSet) {
+	if !o.local {
+		return
 	}
-	return roleWorkflowCost + " Supervised runs are not measured."
+	set := map[string]bool{}
+	f.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	if !set["entry"] {
+		o.scope.Entry = "implement"
+	}
+	if !set["until"] && o.scope.Commit {
+		o.scope.Until = "deliver"
+	}
+	if !set["require-review"] {
+		o.scope.RequireReview = o.scope.Entry == "implement" && o.scope.Until != "plan" && o.scope.Until != "implement"
+	}
+	if o.reviews == 0 {
+		o.reviews = 3
+	}
+}
+
+// workflowRoleConfig is the role assignment of a new run. A local run in a
+// repository without a roles file needs none: see localHosts.
+func workflowRoleConfig(root string, local bool) (*roles.Config, error) {
+	if _, err := os.Lstat(filepath.Join(root, roles.FileName)); !local || !errors.Is(err, fs.ErrNotExist) {
+		return dailyRoleConfig(root)
+	}
+	var installed []string
+	for _, host := range roles.Hosts {
+		if _, native := onboarding.HostExecutable(host); native {
+			installed = append(installed, host)
+		}
+	}
+	preferred, _ := uxInstalledHost()
+	developer, reviewer := localHosts(preferred, installed)
+	if developer == "" {
+		return dailyRoleConfig(root) // A run of the checks alone starts none.
+	}
+	assigned := func(host string) []byte { return fmt.Appendf(nil, "[roles.reviewer]\nhost = %q", host) }
+	return roles.LoadWithWorkflowDefault(root, bytes.Replace(roles.WorkflowTemplate(developer), assigned(developer), assigned(reviewer), 1))
+}
+
+// localHosts picks the hosts of a local run without a roles file. The
+// developer works in the host Kitsu was installed for, or else in the first
+// installed one. The reviewer works in the other host where that is
+// installed, so that a second model reads the change.
+func localHosts(preferred string, installed []string) (developer, reviewer string) {
+	if len(installed) == 0 {
+		return "", ""
+	}
+	developer = installed[0]
+	if slices.Contains(installed, preferred) {
+		developer = preferred
+	}
+	reviewer = developer
+	for _, host := range installed {
+		if host != developer {
+			reviewer = host
+		}
+	}
+	return developer, reviewer
+}
+
+// savedWorkflow reads a saved task for a line of output, or returns nil.
+func savedWorkflow(s *session, id string) *harness.Task {
+	l, err := readOnlyStageLedger(s.repo.GitDir)
+	if err != nil {
+		return nil
+	}
+	defer l.close()
+	task, _ := readWorkflow(l, id)
+	return task
+}
+
+// announceWorkflow is what a new run says before its first job. A local run
+// names its stages. With --json it says the task's name alone: a chat reads
+// every line.
+func announceWorkflow(ctx context.Context, s *session, o workflowOptions) {
+	if o.resume != "" {
+		return
+	}
+	fmt.Fprintf(s.cfg.Err, "Kitsu task %s. Resume with kitsu task run --resume %s\n", o.id, o.id)
+	task := savedWorkflow(s, o.id)
+	switch {
+	case !o.local:
+		fmt.Fprintln(s.cfg.Err, roleWorkflowCost+" Supervised runs are not measured.")
+	case !o.json && task != nil:
+		fmt.Fprintln(s.cfg.Err, "Runner: local. The approved checks of kitsu.toml and each agent run as you, in a private copy of your change. An agent is a fresh Codex or Claude Code process and uses tokens of your account.")
+		required, _ := repositoryRequiresReview(ctx, s, task, task.Start)
+		fmt.Fprintln(s.cfg.Err, localStages(task, s.workflowRunner.Offer().Policy.Checks, required))
+	}
+}
+
+// localStages lists what a local run starts, in order. required says that
+// kitsu.toml asks for a review of every change.
+func localStages(t *harness.Task, checks []workflowrunner.Check, required bool) string {
+	agent := func(role string) string {
+		assigned := t.Workflow.Roles[role]
+		return fmt.Sprintf("%s (%s, %s)", role, assigned.Host, cmp.Or(assigned.Model.Model, "its default model"))
+	}
+	ids := make([]string, len(checks))
+	for i, check := range checks {
+		ids[i] = check.ID
+	}
+	scope, stages := t.Scope, []string{}
+	review := required || scope.RequireReview || scope.Entry == "review" || scope.Until == "review"
+	if scope.Entry == "implement" {
+		stages = append(stages, agent("developer"))
+	} else if scope.Entry == "review" {
+		stages, review = append(stages, agent("reviewer")), false
+	}
+	if scope.Until == "verify" || scope.Until == "deliver" {
+		stages = append(stages, "checks ("+strings.Join(ids, ", ")+")")
+	}
+	if review {
+		stages = append(stages, agent("reviewer"))
+	}
+	if scope.Commit {
+		stages = append(stages, "commit")
+	}
+	return fmt.Sprintf("Stages: %s. At most %d repairs and %d reviews.", strings.Join(stages, ", then "), t.Workflow.ReworkMax, t.ReviewLimit)
+}
+
+// announceWorkflowStage is the progress line of one job.
+func announceWorkflowStage(s *session, o workflowOptions, a *harness.WorkflowAttempt) {
+	switch local := s.workflowRunner.Offer().Profile == localrunner.Profile; {
+	case local && o.json:
+	case local && a.Role != "":
+		fmt.Fprintf(s.cfg.Err, "Kitsu task %s · %s · %s on %s\n", o.id, a.Action, a.Role, a.Host)
+	default:
+		fmt.Fprintf(s.cfg.Err, "Kitsu task %s · %s\n", o.id, a.Action)
+	}
+}
+
+// printWorkflowReply is the --json reply of a run. A chat reads all of it, so
+// a local run answers in one line with what the chat reports; the rest is one
+// command away, in details.
+func printWorkflowReply(s *session, o workflowOptions, reply map[string]any) error {
+	if s.workflowRunner.Offer().Profile != localrunner.Profile {
+		return printJSON(s.cfg, reply)
+	}
+	for key := range reply {
+		if !slices.Contains([]string{"task", "next", "verified", "repository_checks", "delivery", "review_findings", "workflow_problem", "diagnostic", "pause", "resume", "details"}, key) {
+			delete(reply, key)
+		}
+	}
+	if t := savedWorkflow(s, o.id); t != nil {
+		var tokens int64 // of every agent the run started: input, cached or not, and output
+		for _, a := range t.Workflow.Attempts {
+			tokens += a.Usage["input_tokens"] + a.Usage["output_tokens"]
+		}
+		reply["tokens"] = tokens
+	}
+	return json.NewEncoder(s.cfg.Out).Encode(reply)
+}
+
+// printWorkflowUsage lists what each job of a local run took: its time and,
+// for an agent, the tokens its host reported.
+func printWorkflowUsage(s *session, id string) {
+	t := savedWorkflow(s, id)
+	if t == nil || t.Workflow.Profile != localrunner.Profile ||
+		!slices.ContainsFunc(t.Workflow.Attempts, func(a harness.WorkflowAttempt) bool { return a.Role != "" }) {
+		return
+	}
+	w := tabwriter.NewWriter(s.cfg.Out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "STAGE\tAGENT\tTIME\tINPUT TOKENS\tOF THEM CACHED\tOUTPUT TOKENS")
+	var elapsed time.Duration
+	var input, cached, output int64
+	for _, a := range t.Workflow.Attempts {
+		elapsed += a.Elapsed
+		if a.Role == "" {
+			fmt.Fprintf(w, "%s\tchecks\t%s\n", a.Action, a.Elapsed.Round(time.Second/10))
+			continue
+		}
+		in, hit, out := a.Usage["input_tokens"], a.Usage["cached_input_tokens"], a.Usage["output_tokens"]
+		input, cached, output = input+in, cached+hit, output+out
+		fmt.Fprintf(w, "%s\t%s on %s\t%s\t%s\t%s\t%s\n", a.Action, a.Role, a.Host, a.Elapsed.Round(time.Second/10), commas(in), commas(hit), commas(out))
+	}
+	fmt.Fprintf(w, "total\t\t%s\t%s\t%s\t%s\n", elapsed.Round(time.Second/10), commas(input), commas(cached), commas(output))
+	_ = w.Flush()
 }
 
 // directAssignment is what the developer of a run without an architect and a

@@ -79,29 +79,21 @@ func authorityDiffers(r *Runner, others ...*Runner) error {
 	return os.ErrInvalid
 }
 
-func TestAJobWithoutAResultIsReleasedWithItsReason(t *testing.T) {
+func TestAJobTheRunnerNoLongerHoldsIsReleasedWithItsReason(t *testing.T) {
 	asUser(t)
 	r := open(t, t.TempDir())
-	job := workflowrunner.Job{Attempt: attemptName, Binding: "binding", Profile: Profile,
-		Policy: workflowrunner.Digest(r.Offer().Policy), Kind: "implement", Role: "developer"}
-	_, agent, err := r.Run(t.Context(), job)
-	_, lost, lostErr := r.Resume(t.Context(), attemptName, "binding", "job")
-	if err != nil || lostErr != nil {
-		t.Fatal(err, lostErr)
+	_, lost, err := r.Resume(t.Context(), attemptName, "binding", "job")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for name, got := range map[string]workflowrunner.Receipt{"starts no agent yet": agent, "no longer holds this job": lost} {
-		if got.Status != "stopped" || !got.Stopped || !got.Release || !strings.Contains(string(got.Result), name) {
-			t.Errorf("want a released stop that says %q, got %+v with %s", name, got, got.Result)
-		}
-	}
-	if agent.Job != workflowrunner.Digest(job) || lost.Job != "job" {
-		t.Errorf("the receipts name other jobs: %q and %q", agent.Job, lost.Job)
+	if lost.Status != "stopped" || !lost.Stopped || !lost.Release || lost.Job != "job" || !strings.Contains(string(lost.Result), "no longer holds this job") {
+		t.Errorf("want a released stop that says why, got %+v with %s", lost, lost.Result)
 	}
 	if entries, _ := os.ReadDir(r.cache); len(entries) != 0 {
 		t.Errorf("a job that never started left %d entries behind", len(entries))
 	}
 
-	job.Policy = "another policy"
+	job := workflowrunner.Job{Attempt: attemptName, Binding: "binding", Profile: Profile, Policy: "another policy", Kind: "verify"}
 	if _, _, err := r.Run(t.Context(), job); err == nil {
 		t.Error("a job built for another policy was accepted")
 	}

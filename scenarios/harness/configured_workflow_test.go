@@ -22,7 +22,8 @@ func TestConfiguredWorkflowRejectsLegacyApprovalAndNativeLaunch(t *testing.T) {
 		{"Plan a change", "--native-host", "codex", "--actor", "session"},
 	} {
 		got := r.Kitsu(append([]string{"task", "run"}, input...)...)
-		if got.Code == 0 || !strings.Contains(got.Output(), "runner") && !strings.Contains(got.Output(), "supervised") {
+		// The flags of the former local launcher are gone: an unknown option.
+		if got.Code == 0 || !strings.Contains(got.Output(), "runner") && !strings.Contains(got.Output(), "unknown option: --native-host") {
 			t.Fatalf("accepted legacy arguments %v: %s", input, got.Output())
 		}
 	}

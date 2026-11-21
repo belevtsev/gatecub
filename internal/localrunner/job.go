@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -52,9 +53,8 @@ func Supervise(ctx context.Context, dir string, program func(tree string, check 
 	ctx, stop := context.WithDeadline(ctx, a.Job.Deadline)
 	defer stop()
 	go watch(ctx, stop, filepath.Join(dir, cancelFile))
-	checks, err := a.run(ctx, dir, program)
 	got := r.receipt(a.Job.Attempt, a.Job.Binding, a.Key, "returned", "")
-	got.Checks = checks
+	err = a.run(ctx, dir, program, &got)
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		got = r.receipt(a.Job.Attempt, a.Job.Binding, a.Key, "stopped", "the job did not end before its deadline")
@@ -83,26 +83,33 @@ func watch(ctx context.Context, stop context.CancelFunc, mark string) {
 	}
 }
 
-// run makes the private copy of the candidate and runs every check of the job
-// in it, in order. A check that fails does not stop the ones after it.
-func (a attempt) run(ctx context.Context, dir string, program func(string, workflowrunner.Check) (string, error)) ([]workflowrunner.CheckResult, error) {
+// run makes the private copy of the candidate and does the job in it: the
+// agent of a role, or every check in order. A check that fails does not stop
+// the ones after it. What the job returned goes into got.
+func (a attempt) run(ctx context.Context, dir string, program func(string, workflowrunner.Check) (string, error), got *workflowrunner.Receipt) error {
 	var files []workflowrunner.File
 	if err := readJSON(dir, filesFile, &files); err != nil {
-		return nil, err
+		return err
 	}
-	tree := filepath.Join(dir, treeDir)
-	if err := materialize(ctx, tree, files); err != nil {
-		return nil, fmt.Errorf("the private copy of the candidate could not be made: %w", err)
+	// A copy of its own: the worker of a supervisor that was killed may still
+	// be writing into the one before. Its name is short, because most programs
+	// on Windows open no path longer than 260 characters.
+	_ = os.RemoveAll(filepath.Join(dir, treeDir))
+	tree := filepath.Join(dir, treeDir, rand.Text()[:8])
+	if err := materialize(ctx, a.Project, tree, files); err != nil {
+		return fmt.Errorf("the private copy of the candidate could not be made: %w", err)
 	}
-	var results []workflowrunner.CheckResult
+	if a.Job.Role != "" {
+		return a.work(ctx, dir, tree, files, got)
+	}
 	for _, id := range a.Job.Checks {
-		got, err := a.check(ctx, tree, id, program)
+		result, err := a.check(ctx, tree, id, program)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		results = append(results, got)
+		got.Checks = append(got.Checks, result)
 	}
-	return results, nil
+	return nil
 }
 
 // check runs one check of the policy in the private copy. The outcome is an
@@ -140,8 +147,10 @@ func (a attempt) check(ctx context.Context, tree, id string, program func(string
 
 // materialize writes the candidate into tree and commits it there, so that a
 // check which asks git about the candidate gets an answer. The repository of
-// the copy has that one commit and none of the history.
-func materialize(ctx context.Context, tree string, files []workflowrunner.File) error {
+// the copy has that one commit and none of the history. It can read the
+// objects of the project, so that a reviewer can run the comparison its
+// assignment names.
+func materialize(ctx context.Context, project, tree string, files []workflowrunner.File) error {
 	if err := os.RemoveAll(tree); err != nil {
 		return err
 	}
@@ -165,15 +174,23 @@ func materialize(ctx context.Context, tree string, files []workflowrunner.File) 
 			return err
 		}
 	}
-	for _, args := range [][]string{
+	objects := proc.Run(ctx, proc.Spec{Path: "git", Args: []string{"rev-parse", "--path-format=absolute", "--git-path", "objects"},
+		Dir: project, Env: environment(), StdoutLimit: 4 << 10})
+	for i, args := range [][]string{
 		{"init", "-q", "--template="},
 		{"config", "core.fsmonitor", "false"}, // a daemon would outlive the job and hold the copy
+		{"config", "core.longpaths", "true"},  // Git for Windows stops at 260 characters without it
 		{"add", "-A", "-f"},
 		{"-c", "user.name=Kitsu", "-c", "user.email=kitsu@localhost", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=" + os.DevNull,
 			"commit", "-q", "--no-verify", "--allow-empty", "-m", "Candidate"},
 	} {
 		if ended := proc.Run(ctx, proc.Spec{Path: "git", Args: args, Dir: tree, Env: environment(), StderrLimit: 4 << 10}); ended.Code != 0 {
 			return fmt.Errorf("git %s: %s %v", args[0], bytes.TrimSpace(ended.Stderr), ended.Err)
+		}
+		if i == 0 && objects.Code == 0 {
+			if err := root.WriteFile(".git/objects/info/alternates", objects.Stdout, 0o644); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

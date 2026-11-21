@@ -28,10 +28,7 @@ func validateConfiguredStage(b workerBrief) error {
 		allowed = stage == change.StageSpec
 	case "design", "design-review":
 		allowed = stage == change.StageDesign
-	case "tests":
-		allowed = stage == change.StageTests || stage == change.StageCode || stage == change.StageReview
-	case "code":
-		// An approved design can authorize an empty interface before tests.
+	case "tests", "code": // An approved design can authorize an empty interface before tests.
 		allowed = stage == change.StageTests || stage == change.StageCode || stage == change.StageReview
 	case "review":
 		allowed = stage == change.StageCode || stage == change.StageReview

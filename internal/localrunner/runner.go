@@ -1,6 +1,7 @@
 // Package localrunner runs the jobs of a configured task on the developer's
-// own machine. A job runs under a detached supervisor, in a private copy of
-// the candidate, and ends in a receipt signed with a key of this user.
+// own machine: its checks, and the headless Codex or Claude Code agent of a
+// role. A job runs under a detached supervisor, in a private copy of the
+// candidate, and ends in a receipt signed with a key of this user.
 //
 // The receipt of a local job proves less than one of a registered runner
 // service: the job ran as the developer, who also holds the key. Every local
@@ -136,8 +137,7 @@ func (r *Runner) Authority() string {
 
 func (r *Runner) Offer() workflowrunner.Capabilities { return r.offer }
 
-// Run keeps the job for its supervisor and waits for the result. A job for an
-// agent ends at once without one: this runner starts no agent yet.
+// Run keeps the job for its supervisor and waits for the result.
 func (r *Runner) Run(ctx context.Context, job workflowrunner.Job) (workflowrunner.Signed, workflowrunner.Receipt, error) {
 	dir, err := r.dir(job.Attempt)
 	if err == nil && (job.Profile != Profile || job.Policy != workflowrunner.Digest(r.offer.Policy)) {
@@ -147,11 +147,6 @@ func (r *Runner) Run(ctx context.Context, job workflowrunner.Job) (workflowrunne
 		return workflowrunner.Signed{}, workflowrunner.Receipt{}, err
 	}
 	key := workflowrunner.Digest(job)
-	if job.Role != "" {
-		got := r.receipt(job.Attempt, job.Binding, key, "stopped",
-			"the local runner starts no agent yet. It runs the checks of a task opened with --entry verify")
-		return r.sign(got), got, nil
-	}
 	if _, err := os.Stat(filepath.Join(dir, attemptFile)); errors.Is(err, fs.ErrNotExist) {
 		record := attempt{Project: r.project, Offer: r.offer, Limits: r.limits, Key: key, Job: job}
 		record.Job.Files = nil

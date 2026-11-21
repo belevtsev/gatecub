@@ -88,23 +88,30 @@ Add `--repair` when you authorize source changes. Use `--until deliver --commit`
 
 Kitsu applies the configured rework limit, records test and code corrections, and verifies again when assertions or content change. Inspect progress with `kitsu task next TASK_ID --json`.
 
-## Verify on your own machine
+## Run a task on your own machine
 
-`--local` runs the jobs of a task on your machine, with no runner service. In this version a local run starts at verification and starts no agent.
+`--local` runs the jobs of a task on your machine, with no runner service. Kitsu decides every stage in code and starts each agent itself: a developer, then the checks, then a reviewer when you ask for one.
 
 ```sh
 kitsu check trust
-kitsu task run --local "Verify CSV quoting" --id csv --entry verify
+kitsu task run --local "Fix CSV quoting" --id csv --entry implement --require-review
+kitsu task run --local "Verify CSV quoting" --id csv-check --entry verify
 kitsu task run --resume csv
 ```
 
+- **Stages.** `--entry implement` starts the developer. A failed check or a review finding goes back to the developer, at most as often as `--rework-limit` allows (2 by default). `--entry review` and `--entry verify` start from your own change. A local run starts no architect and no test writer, so `--entry plan`, the default, and `--entry tests` are refused.
+- **Agents.** The developer and the reviewer are the hosts and models of your [role assignments](roles.md). Each one is a fresh headless `codex exec` or `claude --print` process that uses tokens of your account. The developer may edit files in its copy and gets no wider permission; the reviewer runs in the host's read-only mode. Claude Code loads your user settings and none of a project.
+- **Recorded model and effort.** Claude Code names the model it runs. Codex names none, and neither host reports its effort. For those, the task records what the host was started with.
+- **Environment.** An agent inherits your home, `PATH`, locale, proxy settings, the host's configuration directory and its API key variable. Other variables are not passed on: a token of another service, or a gateway or cloud provider that you set in your shell. Set those in the host's own settings file.
 - **Gate.** The checks of `kitsu.toml` gate the run. Approve them once with `kitsu check trust` in your own terminal. `--expect` is optional, and its command must be one of the declared checks.
-- **Private copy.** Each job runs in a copy of your change under your user cache directory. The copy is a Git repository with one commit. It has none of your history, ignored files or dependency folders.
+- **Private copy.** Each job runs in a copy of your change under your user cache directory. The copy is a Git repository with one commit that can read the objects of your project. It has none of your ignored files, dependency folders or host configuration such as `CLAUDE.md`.
+- **Returned changes.** Kitsu imports the files that differ from the copy the developer was given. A new file that Git ignores in your project is left behind. A result that touches `kitsu.toml`, the role assignments, host configuration, Git files, the hook directory or `openspec/` is refused as a whole, and your worktree stays as it was.
+- **Tests and check scripts.** The developer writes the tests, so it may also change an existing test, a script that a check runs or a tool's configuration. Only the commands in `kitsu.toml` are fixed. The developer is told to change those files only where the request needs it, and the reviewer is told to report a weakened one. Add `--require-review` and read the diff when that matters.
 - **Stopped command.** A job outlives the command that started it. After the command is killed, `--resume` waits for the same job and returns its result. Ctrl+C stops the job. `--resume TASK` then reports the stop, and `--resume TASK --retry` starts the job again.
 - **Changed policy.** A `kitsu.toml` that changed since the task started refuses the resume.
 - **Registered worktrees.** Where an administrator registered a runner for the worktree, `--local` is refused and local results do not count.
 
-**What a local run proves.** The checks ran as you, with your network and your files, and a key in your user configuration directory signs the receipt. Any program that runs as you can use that key. A local result therefore tells you what the checks returned on the exact change. It does not prove that to someone else. Kitsu marks such a result `runner: local`. Use a [trusted runner](workflow-runner.md) when the result must hold against the person or agent who made the change.
+**What a local run proves.** The checks and the agents ran as you, with your network and your files, and a key in your user configuration directory signs the receipt. Any program that runs as you can use that key. The private copy and the import rules stop careless damage. They do not stop an agent that sets out to cheat. A local result therefore tells you what the checks returned on the exact change. It does not prove that to someone else. Kitsu marks such a result `runner: local`. Use a [trusted runner](workflow-runner.md) when the result must hold against the person or agent who made the change.
 
 ## Recover a stopped run
 

@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Verify a change on your own machine with [`kitsu task run --local --entry verify`](docs/configured-workflow.md#verify-on-your-own-machine), gated by the approved checks of `kitsu.toml`.
+- Run a task on your own machine with [`kitsu task run --local`](docs/configured-workflow.md#run-a-task-on-your-own-machine): a headless developer and reviewer behind your approved checks.
 
 - Open, verify and commit a daily task or bug ticket with [one `kitsu task do` command](docs/task-harness.md#do-a-daily-task-in-one-command).
 

@@ -46,8 +46,8 @@ func openWorkflowRunner(ctx context.Context, cfg Config, s *session, o workflowO
 		unread = err
 	}
 	switch {
-	case local && o.resume == "" && o.scope.Entry != "verify":
-		return nil, errors.New("a local run starts no agent yet. Add --entry verify to run the checks of kitsu.toml on your change")
+	case local && o.resume == "" && (o.scope.Entry == "plan" || o.scope.Entry == "tests"):
+		return nil, errors.New("a local run starts no architect and no test writer yet. Add --entry implement, review or verify")
 	case local:
 		return openLocalRunner(ctx, s, pinned)
 	case cfg.workflowRunner != nil:
@@ -145,9 +145,34 @@ func workflowStopReason(got workflowrunner.Receipt) string {
 // workflowStartNotice is what a new run says before its first job.
 func workflowStartNotice(o workflowOptions) string {
 	if o.local {
-		return "Runner: local. The approved checks of kitsu.toml run as you, in a private copy of your change. No agent starts, so the run uses no tokens."
+		return "Runner: local. The approved checks of kitsu.toml and each agent run as you, in a private copy of your change. An agent is a fresh Codex or Claude Code process and uses tokens of your account."
 	}
 	return roleWorkflowCost + " Supervised runs are not measured."
+}
+
+// directAssignment is what the developer of a run without an architect and a
+// test writer is told, in place of the instructions of a planned run.
+//
+// Such a developer owns the tests, and nothing but the protected paths limits
+// what it returns. Both workers are therefore told not to let a check pass by
+// weakening it.
+func directAssignment(task *harness.Task, planned string) string {
+	switch role := task.Workflow.Active.Role; {
+	case task.Direct() && role == "developer":
+		return "Implement or repair the request, with the tests that prove it. Fix the code, not the gate: change an existing test, a script that a check runs or the configuration of a tool only where the request needs it, and say so in note. Preserve pre-existing unrelated work, HEAD, and the index. Kitsu runs verification and performs any authorized commit."
+	case task.Direct() && role == "reviewer":
+		return planned + " A test, a script that a check runs or the configuration of a tool that was weakened or removed without the request asking for it is a code: finding."
+	}
+	return planned
+}
+
+// directCorrections sends every finding of such a run back to its developer,
+// who owns the tests and the design too.
+func directCorrections(task *harness.Task, planned []string) []string {
+	if task.Direct() && len(planned) > 0 {
+		return []string{"repair"}
+	}
+	return planned
 }
 
 // localRunnerMark tells a result of the local runner from one of a registered

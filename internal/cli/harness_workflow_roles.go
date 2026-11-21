@@ -96,7 +96,7 @@ func workflowAssignment(ctx context.Context, s *session, task *harness.Task, v h
 	if err != nil {
 		return "", err
 	}
-	instructions += "\nUse only your assigned role. The runner supplies the approved profile and selected skills.\n"
+	instructions = directAssignment(task, instructions) + "\nUse only your assigned role. The runner supplies the approved profile and selected skills.\n"
 	return fmt.Sprintf("%s\nContext: %s\nReturn only the structured role result.", instructions, payload), nil
 }
 
@@ -133,7 +133,7 @@ func routeWorkflowFindings(task *harness.Task, findings []string) error {
 			return failf("review finding needs an explicit test, code, or design classification")
 		}
 	}
-	task.Workflow.Pending = workflowCorrections(task.Workflow.Pending, actions...)
+	task.Workflow.Pending = workflowCorrections(task.Workflow.Pending, directCorrections(task, actions)...)
 	return nil
 }
 

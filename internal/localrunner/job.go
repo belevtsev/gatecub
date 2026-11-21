@@ -92,9 +92,10 @@ func (a attempt) run(ctx context.Context, dir string, program func(string, workf
 		return err
 	}
 	// A copy of its own: the worker of a supervisor that was killed may still
-	// be writing into the one before.
+	// be writing into the one before. Its name is short, because most programs
+	// on Windows open no path longer than 260 characters.
 	_ = os.RemoveAll(filepath.Join(dir, treeDir))
-	tree := filepath.Join(dir, treeDir, rand.Text())
+	tree := filepath.Join(dir, treeDir, rand.Text()[:8])
 	if err := materialize(ctx, a.Project, tree, files); err != nil {
 		return fmt.Errorf("the private copy of the candidate could not be made: %w", err)
 	}
@@ -178,6 +179,7 @@ func materialize(ctx context.Context, project, tree string, files []workflowrunn
 	for i, args := range [][]string{
 		{"init", "-q", "--template="},
 		{"config", "core.fsmonitor", "false"}, // a daemon would outlive the job and hold the copy
+		{"config", "core.longpaths", "true"},  // Git for Windows stops at 260 characters without it
 		{"add", "-A", "-f"},
 		{"-c", "user.name=Kitsu", "-c", "user.email=kitsu@localhost", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=" + os.DevNull,
 			"commit", "-q", "--no-verify", "--allow-empty", "-m", "Candidate"},

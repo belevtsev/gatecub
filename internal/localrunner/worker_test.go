@@ -62,6 +62,25 @@ func TestARoleNeedsItsHostOnPath(t *testing.T) {
 	}
 }
 
+// The copy lies under the user's cache directory, so the objects of its
+// repository can lie deeper than the 260 characters Git for Windows opens by
+// default.
+func TestThePrivateCopyHoldsARepositoryBelowALongPath(t *testing.T) {
+	asUser(t)
+	// 215 characters: a new repository still fits, an object of it does not.
+	base := t.TempDir()
+	tree := filepath.Join(base, strings.Repeat("p", max(1, 209-len(base))), "tree")
+	candidate := []workflowrunner.File{{Path: "src/app.txt", Mode: "100644", Data: []byte("ok\n")}}
+	if err := materialize(t.Context(), t.TempDir(), tree, candidate); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command("git", "status", "--porcelain")
+	command.Dir = tree
+	if out, err := command.CombinedOutput(); err != nil || len(out) != 0 {
+		t.Fatalf("the copy at %s (%d characters) is not a clean repository of the candidate: %v\n%s", tree, len(tree), err, out)
+	}
+}
+
 func TestChangesAreWhatDiffersFromTheCandidateWhateverTheWorkerDidToGit(t *testing.T) {
 	asUser(t)
 	tree := filepath.Join(t.TempDir(), "tree")

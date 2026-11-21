@@ -29,6 +29,7 @@ func workflowCommand() uxCommand {
 			uxOption("commit", "", "deliver one verified local commit"),
 			uxOption("include", "path", "include a pre-existing change in the authorized commit"),
 			uxOption("expect", "text", "require a reviewed assertion with -- PROGRAM ARGS"),
+			uxOption("local", "", "run the jobs on this machine, gated by the approved checks of kitsu.toml"),
 			requireReviewFlag(),
 			uxOption("retry", "", "retry the current stage after resolving a reported problem"),
 			uxOption("release", "attempt", "reconcile an outstanding attempt with the runner operator’s release authorization"),
@@ -43,7 +44,7 @@ type workflowOptions struct {
 	harnessOptions
 	resume, nativeHost, actorID, release string
 	reworkMax                            int
-	approveAssertion                     bool
+	approveAssertion, local              bool
 }
 
 func parseWorkflow(args []string) (workflowOptions, error) {
@@ -65,6 +66,7 @@ func parseWorkflow(args []string) (workflowOptions, error) {
 	f.BoolVar(&o.retry, "retry", false, "")
 	f.BoolVar(&o.approveAssertion, "approve-assertion", false, "")
 	f.BoolVar(&o.json, "json", false, "")
+	f.BoolVar(&o.local, "local", false, "")
 	o.bindLimitFlags(f)
 	p, err := parseArgs(f, args)
 	if err != nil {
@@ -111,7 +113,7 @@ func (o workflowOptions) openRequest(p parsed) (workflowOptions, error) {
 	if (p.dash || o.expect != "") && (len(o.argv) == 0 || strings.TrimSpace(o.expect) == "") {
 		return o, usagef("a supplied assertion requires --expect TEXT -- PROGRAM ARGS")
 	}
-	if needsAssertion && len(o.argv) == 0 {
+	if needsAssertion && len(o.argv) == 0 && !o.local {
 		return o, usagef("verification entry requires an assertion after --")
 	}
 	return o, nil
@@ -139,12 +141,7 @@ func runConfiguredWorkflow(ctx context.Context, cfg Config, args []string) error
 	if err != nil {
 		return err
 	}
-	if cfg.workflowRunner != nil {
-		s.workflowRunner, err = cfg.workflowRunner(ctx, s.repo.Root)
-	} else {
-		s.workflowRunner, err = workflowrunner.Open(ctx, s.repo.Root)
-	}
-	if err != nil {
+	if s.workflowRunner, err = openWorkflowRunner(ctx, cfg, s, o); err != nil {
 		return failf("configured workflow paused: %v", err)
 	}
 	if err := validateWorkflowPolicy(s.workflowRunner.Offer().Policy); err != nil {
@@ -158,7 +155,7 @@ func runConfiguredWorkflow(ctx context.Context, cfg Config, args []string) error
 	}
 
 	if o.resume == "" {
-		fmt.Fprintf(cfg.Err, "Kitsu task %s. Resume with kitsu task run --resume %s\n%s Supervised runs are not measured.\n", o.id, o.id, optInCost)
+		fmt.Fprintf(cfg.Err, "Kitsu task %s. Resume with kitsu task run --resume %s\n%s\n", o.id, o.id, workflowStartNotice(o))
 	}
 	for {
 		if err := ctx.Err(); err != nil {

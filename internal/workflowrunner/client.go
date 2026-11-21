@@ -30,6 +30,8 @@ type Registration struct {
 	ReceiptKey        []byte `json:"receipt_key"`
 }
 
+var ErrUnregistered = errors.New("no trusted workflow runner is registered for this worktree. Register one (docs/workflow-runner.md) or run on this machine with --local") // from Load
+
 // Runner starts jobs and returns their signed results. The client of a registered service is one runner.
 type Runner interface {
 	Run(ctx context.Context, job Job) (Signed, Receipt, error)
@@ -88,7 +90,7 @@ func Load(root string) (*Client, error) {
 		}
 	}
 	if match == nil {
-		return nil, errors.New("no trusted workflow runner registered for this worktree")
+		return nil, ErrUnregistered
 	}
 	return newClient(*match)
 }

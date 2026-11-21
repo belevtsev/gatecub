@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Verify a change on your own machine with [`kitsu task run --local --entry verify`](docs/configured-workflow.md#verify-on-your-own-machine), gated by the approved checks of `kitsu.toml`.
+
 - Open, verify and commit a daily task or bug ticket with [one `kitsu task do` command](docs/task-harness.md#do-a-daily-task-in-one-command).
 
 - Show actionable [Jev story review results](docs/advisers.md#review-feature-stories-at-intake-with-jev) in brief task status.

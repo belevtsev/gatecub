@@ -181,7 +181,7 @@ func launchWorkflowAttempt(ctx context.Context, s *session, o workflowOptions, s
 		if !got.Release {
 			return failf("runner confirmed attempt %s stopped; the operator must authorize release before retrying", a.ID)
 		}
-		return completeWorkflowFailure(l, t, "runner stopped without a completed result")
+		return completeWorkflowFailure(l, t, "runner stopped without a completed result"+workflowStopReason(got))
 	}
 	if err := l.write(workflowReceiptFile(a.ID), signed); err != nil {
 		return err
